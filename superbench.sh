@@ -460,7 +460,7 @@ freedisk() {
 	#fi
 	freespace=$( df -m . | awk 'NR==2 {print $4}' )
 	if [[ $freespace == "" ]]; then
-		$freespace=$( df -m . | awk 'NR==3 {print $3}' )
+		freespace=$( df -m . | awk 'NR==3 {print $3}' )
 	fi
 	if [[ $freespace -gt 1024 ]]; then
 		printf "%s" $((1024*2))
