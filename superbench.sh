@@ -21,13 +21,13 @@ about() {
 	echo " ========================================================= "
 	echo " \                 Superbench.sh  Script                 / "
 	echo " \       Basic system info, I/O test and speedtest       / "
-	echo " \                  v1.0.9 (18 Jul 2018)                 / "
+	echo " \                   v1.1.4 (1 Jan 2019)                 / "
 	echo " \                   Created by Oldking                  / "
 	echo " ========================================================= "
 	echo ""
 	echo " Intro: https://www.oldking.net/350.html"
-	echo " Copyright (C) 2018 Oldking oooldking@gmail.com"
-	echo " The Previous Version: superbench_old.sh"
+	echo " Copyright (C) 2019 Oldking oooldking@gmail.com"
+	echo -e " ${RED}Happy New Year!${PLAIN}"
 	echo ""
 }
 
@@ -186,11 +186,17 @@ next() {
 speed_test(){
 	if [[ $1 == '' ]]; then
 		temp=$(python speedtest.py --share 2>&1)
-		is_down=$(echo "$temp" | grep 'Download') 
+		is_down=$(echo "$temp" | grep 'Download')
+		result_speed=$(echo "$temp" | awk -F ' ' '/results/{print $3}')
 		if [[ ${is_down} ]]; then
 	        local REDownload=$(echo "$temp" | awk -F ':' '/Download/{print $2}')
 	        local reupload=$(echo "$temp" | awk -F ':' '/Upload/{print $2}')
 	        local relatency=$(echo "$temp" | awk -F ':' '/Hosted/{print $2}')
+
+	        temp=$(echo "$relatency" | awk -F '.' '{print $1}')
+        	if [[ ${temp} -gt 50 ]]; then
+            	relatency=" (*)"${relatency}
+        	fi
 	        local nodeName=$2
 
 	        temp=$(echo "${REDownload}" | awk -F ' ' '{print $1}')
@@ -208,10 +214,10 @@ speed_test(){
 	        local reupload=$(echo "$temp" | awk -F ':' '/Upload/{print $2}')
 	        local relatency=$(echo "$temp" | awk -F ':' '/Hosted/{print $2}')
 	        #local relatency=$(pingtest $3)
-	        temp=$(echo "$relatency" | awk -F '.' '{print $1}')
-        	if [[ ${temp} -gt 1000 ]]; then
-            	relatency=" 0.000 ms"
-        	fi
+	        #temp=$(echo "$relatency" | awk -F '.' '{print $1}')
+        	#if [[ ${temp} -gt 1000 ]]; then
+            	relatency=" - "
+        	#fi
 	        local nodeName=$2
 
 	        temp=$(echo "${REDownload}" | awk -F ' ' '{print $1}')
@@ -228,15 +234,14 @@ print_speedtest() {
 	printf "%-18s%-18s%-20s%-12s\n" " Node Name" "Upload Speed" "Download Speed" "Latency" | tee -a $log
     speed_test '' 'Speedtest.net'
     speed_fast_com
-    speed_test '3633' 'Shanghai  CT'
-    speed_test '4741' 'Beijing   CT'
+    speed_test '5316' 'Nanjing   CT'
+    speed_test '4751' 'Beijing   CT'
     speed_test '7509' 'Hangzhou  CT'
 	speed_test '4624' 'Chengdu   CT'
 	speed_test '5083' 'Shanghai  CU'
 	speed_test '4863' "Xi'an     CU"
 	speed_test '5726' 'Chongqing CU'
 	speed_test '4665' 'Shanghai  CM'
-	speed_test '5292' "Xi'an     CM"
 	speed_test '4575' 'Chengdu   CM'
 	speed_test '6168' 'Kunming   CM'
 	speed_test '6611' 'Guangzhou CM'
@@ -263,7 +268,7 @@ speed_fast_com() {
 	        temp2=$(echo "$temp1" | awk -F ' ' '/Mbps/{print $1}')
 	        local REDownload="$temp2 Mbit/s"
 	        local reupload="0.00 Mbit/s"
-	        local relatency="0.000 ms"
+	        local relatency="-"
 	        local nodeName="Fast.com"
 
 	        printf "${YELLOW}%-18s${GREEN}%-18s${RED}%-20s${SKYBLUE}%-12s${PLAIN}\n" " ${nodeName}" "${reupload}" "${REDownload}" "${relatency}" | tee -a $log
@@ -369,16 +374,26 @@ ip_info3(){
 }
 
 ip_info4(){
-	echo $(curl -4 -s http://api.ip.la/en?json) > ip_json.json
-	country=$(python tools.py ipip country_name)
-	city=$(python tools.py ipip city)
+	ip_date=$(curl -4 -s http://api.ip.la/en?json)
+	echo $ip_date > ip_json.json
 	isp=$(python tools.py geoip isp)
 	as_tmp=$(python tools.py geoip as)
 	asn=$(echo $as_tmp | awk -F ' ' '{print $1}')
 	org=$(python tools.py geoip org)
-	countryCode=$(python tools.py ipip country_code)
-	region=$(python tools.py ipip province)
-	if [ !city ]; then
+	if [ -z "ip_date" ]; then
+		echo $ip_date
+		echo "hala"
+		country=$(python tools.py ipip country_name)
+		city=$(python tools.py ipip city)
+		countryCode=$(python tools.py ipip country_code)
+		region=$(python tools.py ipip province)
+	else
+		country=$(python tools.py geoip country)
+		city=$(python tools.py geoip city)
+		countryCode=$(python tools.py geoip countryCode)
+		region=$(python tools.py geoip regionName)	
+	fi
+	if [ -z "$city" ]; then
 		city=${region}
 	fi
 
@@ -517,11 +532,12 @@ print_system_info() {
 	echo -e " CPU Cache            : ${SKYBLUE}$corescache ${PLAIN}" | tee -a $log
 	echo -e " OS                   : ${SKYBLUE}$opsy ($lbit Bit) ${YELLOW}$virtual${PLAIN}" | tee -a $log
 	echo -e " Kernel               : ${SKYBLUE}$kern${PLAIN}" | tee -a $log
-	echo -e " Total Space          : ${YELLOW}$disk_total_size GB ${SKYBLUE}($disk_used_size GB Used)${PLAIN}" | tee -a $log
-	echo -e " Total RAM            : ${YELLOW}$tram MB ${SKYBLUE}($uram MB Used $bram MB Buff)${PLAIN}" | tee -a $log
-	echo -e " Total SWAP           : ${SKYBLUE}$swap MB ($uswap MB Used)${PLAIN}" | tee -a $log
+	echo -e " Total Space          : ${SKYBLUE}$disk_used_size GB / ${YELLOW}$disk_total_size GB ${PLAIN}" | tee -a $log
+	echo -e " Total RAM            : ${SKYBLUE}$uram MB / ${YELLOW}$tram MB ${SKYBLUE}($bram MB Buff)${PLAIN}" | tee -a $log
+	echo -e " Total SWAP           : ${SKYBLUE}$uswap MB / $swap MB${PLAIN}" | tee -a $log
 	echo -e " Uptime               : ${SKYBLUE}$up${PLAIN}" | tee -a $log
-	echo -e " Load average         : ${SKYBLUE}$load${PLAIN}" | tee -a $log
+	echo -e " Load Average         : ${SKYBLUE}$load${PLAIN}" | tee -a $log
+	echo -e " TCP CC               : ${YELLOW}$tcpctrl${PLAIN}" | tee -a $log
 }
 
 print_end_time() {
@@ -571,6 +587,8 @@ get_system_info() {
 	disk_size2=($( LANG=C df -hPl | grep -wvE '\-|none|tmpfs|overlay|shm|udev|devtmpfs|by-uuid|chroot|Filesystem' | awk '{print $3}' ))
 	disk_total_size=$( calc_disk ${disk_size1[@]} )
 	disk_used_size=$( calc_disk ${disk_size2[@]} )
+	#tcp congestion control
+	tcpctrl=$( sysctl net.ipv4.tcp_congestion_control | awk -F ' ' '{print $3}' )
 
 	#tmp=$(python tools.py disk 0)
 	#disk_total_size=$(echo $tmp | sed s/G//)
@@ -582,11 +600,13 @@ get_system_info() {
 
 print_intro() {
 	printf ' Superbench.sh -- https://www.oldking.net/350.html\n' | tee -a $log
-	printf " Mode  : \e${GREEN}%s\e${PLAIN}    Version : \e${GREEN}%s${PLAIN}\n" $mode_name 1.0.9 | tee -a $log
+	printf " Mode  : \e${GREEN}%s\e${PLAIN}    Version : \e${GREEN}%s${PLAIN}\n" $mode_name 1.1.4 | tee -a $log
 	printf ' Usage : wget -qO- git.io/superbench.sh | bash\n' | tee -a $log
 }
 
 sharetest() {
+	echo " Share result:" | tee -a $log
+	echo " · $result_speed" | tee -a $log
 	log_preupload
 	case $1 in
 	'ubuntu')
@@ -601,8 +621,7 @@ sharetest() {
 	esac
 
 	# print result info
-	echo " Share result:" | tee -a $log
-	echo " $share_link" | tee -a $log
+	echo " · $share_link" | tee -a $log
 	next
 	echo ""
 	rm -f $log_up
