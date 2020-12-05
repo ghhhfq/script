@@ -2,7 +2,7 @@
 #
 # Description: Auto system info & I/O test & network to China script
 #
-# Copyright (C) 2017 - 2018 Oldking <oooldking@gmail.com>
+# Copyright (C) 2017 - 2020 Oldking <oooldking@gmail.com>
 #
 # Thanks: Bench.sh <i@teddysun.com>
 #
@@ -20,13 +20,12 @@ about() {
 	echo " ========================================================= "
 	echo " \                 Superbench.sh  Script                 / "
 	echo " \       Basic system info, I/O test and speedtest       / "
-	echo " \                   v1.1.4 (1 Jan 2019)                 / "
+	echo " \                   v1.1.7 (7 Apr 2020)                 / "
 	echo " \                   Created by Oldking                  / "
 	echo " ========================================================= "
 	echo ""
 	echo " Intro: https://www.oldking.net/350.html"
-	echo " Copyright (C) 2019 Oldking oooldking@gmail.com"
-	echo -e " ${RED}Happy New Year!${PLAIN}"
+	echo " Copyright (C) 2020 Oldking oooldking@gmail.com"
 	echo ""
 }
 
@@ -95,22 +94,22 @@ benchinit() {
 	            fi
 	fi
 
-	if  [ ! -e 'speedtest.py' ]; then
+	if  [ ! -e './speedtest-cli/speedtest' ]; then
 		echo " Installing Speedtest-cli ..."
-		wget --no-check-certificate https://raw.github.com/sivel/speedtest-cli/master/speedtest.py > /dev/null 2>&1
+		wget --no-check-certificate -qO speedtest.tgz https://cdn.jsdelivr.net/gh/oooldking/script@1.1.7/speedtest_cli/ookla-speedtest-1.0.0-$(uname -m)-linux.tgz > /dev/null 2>&1
 	fi
-	chmod a+rx speedtest.py
+	mkdir -p speedtest-cli && tar zxvf speedtest.tgz -C ./speedtest-cli/ > /dev/null 2>&1 && chmod a+rx ./speedtest-cli/speedtest
 
 	if  [ ! -e 'tools.py' ]; then
 		echo " Installing tools.py ..."
-		wget --no-check-certificate https://raw.githubusercontent.com/oooldking/script/master/tools.py > /dev/null 2>&1
+		wget --no-check-certificate https://cdn.jsdelivr.net/gh/oooldking/script@1.1.7/tools.py > /dev/null 2>&1
 	fi
 	chmod a+rx tools.py
 
 	if  [ ! -e 'fast_com.py' ]; then
 		echo " Installing Fast.com-cli ..."
-		wget --no-check-certificate https://raw.githubusercontent.com/sanderjo/fast.com/master/fast_com.py > /dev/null 2>&1
-		wget --no-check-certificate https://raw.githubusercontent.com/sanderjo/fast.com/master/fast_com_example_usage.py > /dev/null 2>&1
+		wget --no-check-certificate https://cdn.jsdelivr.net/gh/sanderjo/fast.com@master/fast_com.py > /dev/null 2>&1
+		wget --no-check-certificate https://cdn.jsdelivr.net/gh/sanderjo/fast.com@master/fast_com_example_usage.py > /dev/null 2>&1
 	fi
 	chmod a+rx fast_com.py
 	chmod a+rx fast_com_example_usage.py
@@ -132,40 +131,39 @@ next() {
 
 speed_test(){
 	if [[ $1 == '' ]]; then
-		temp=$(python speedtest.py --share 2>&1)
-		is_down=$(echo "$temp" | grep 'Download')
-		result_speed=$(echo "$temp" | awk -F ' ' '/results/{print $3}')
-		if [[ ${is_down} ]]; then
-	        local REDownload=$(echo "$temp" | awk -F ':' '/Download/{print $2}')
-	        local reupload=$(echo "$temp" | awk -F ':' '/Upload/{print $2}')
-	        local relatency=$(echo "$temp" | awk -F ':' '/Hosted/{print $2}')
+		speedtest-cli/speedtest -p no --accept-license > $speedLog 2>&1
+		is_upload=$(cat $speedLog | grep 'Upload')
+		result_speed=$(cat $speedLog | awk -F ' ' '/Result/{print $3}')
+		if [[ ${is_upload} ]]; then
+	        local REDownload=$(cat $speedLog | awk -F ' ' '/Download/{print $3}')
+	        local reupload=$(cat $speedLog | awk -F ' ' '/Upload/{print $3}')
+	        local relatency=$(cat $speedLog | awk -F ' ' '/Latency/{print $2}')
 
 	        temp=$(echo "$relatency" | awk -F '.' '{print $1}')
         	if [[ ${temp} -gt 50 ]]; then
-            	relatency=" (*)"${relatency}
+            	relatency="(*)"${relatency}
         	fi
 	        local nodeName=$2
 
 	        temp=$(echo "${REDownload}" | awk -F ' ' '{print $1}')
 	        if [[ $(awk -v num1=${temp} -v num2=0 'BEGIN{print(num1>num2)?"1":"0"}') -eq 1 ]]; then
-	        	printf "${YELLOW}%-17s${GREEN}%-18s${RED}%-20s${SKYBLUE}%-12s${PLAIN}\n" " ${nodeName}" "${reupload}" "${REDownload}" "${relatency}" | tee -a $log
+	        	printf "${YELLOW}%-18s${GREEN}%-18s${RED}%-20s${SKYBLUE}%-12s${PLAIN}\n" " ${nodeName}" "${reupload} Mbit/s" "${REDownload} Mbit/s" "${relatency} ms" | tee -a $log
 	        fi
 		else
 	        local cerror="ERROR"
 		fi
 	else
-		temp=$(python speedtest.py --server $1 --share 2>&1)
-		is_down=$(echo "$temp" | grep 'Download') 
-		if [[ ${is_down} ]]; then
-	        local REDownload=$(echo "$temp" | awk -F ':' '/Download/{print $2}')
-	        local reupload=$(echo "$temp" | awk -F ':' '/Upload/{print $2}')
-	        local relatency=$(echo "$temp" | awk -F ':' '/Hosted/{print $2}')
-            relatency=" - "
+		speedtest-cli/speedtest -p no -s $1 --accept-license > $speedLog 2>&1
+		is_upload=$(cat $speedLog | grep 'Upload')
+		if [[ ${is_upload} ]]; then
+	        local REDownload=$(cat $speedLog | awk -F ' ' '/Download/{print $3}')
+	        local reupload=$(cat $speedLog | awk -F ' ' '/Upload/{print $3}')
+	        local relatency=$(cat $speedLog | awk -F ' ' '/Latency/{print $2}')
 	        local nodeName=$2
 
 	        temp=$(echo "${REDownload}" | awk -F ' ' '{print $1}')
 	        if [[ $(awk -v num1=${temp} -v num2=0 'BEGIN{print(num1>num2)?"1":"0"}') -eq 1 ]]; then
-	        	printf "${YELLOW}%-17s${GREEN}%-18s${RED}%-20s${SKYBLUE}%-12s${PLAIN}\n" " ${nodeName}" "${reupload}" "${REDownload}" "${relatency}" | tee -a $log
+	        	printf "${YELLOW}%-18s${GREEN}%-18s${RED}%-20s${SKYBLUE}%-12s${PLAIN}\n" " ${nodeName}" "${reupload} Mbit/s" "${REDownload} Mbit/s" "${relatency} ms" | tee -a $log
 			fi
 		else
 	        local cerror="ERROR"
@@ -177,30 +175,31 @@ print_speedtest() {
 	printf "%-18s%-18s%-20s%-12s\n" " Node Name" "Upload Speed" "Download Speed" "Latency" | tee -a $log
     speed_test '' 'Speedtest.net'
     speed_fast_com
-    speed_test '5316' 'Nanjing   CT'
-    speed_test '4751' 'Beijing   CT'
-    speed_test '7509' 'Hangzhou  CT'
-	speed_test '4624' 'Chengdu   CT'
-	speed_test '5083' 'Shanghai  CU'
-	speed_test '4863' "Xi'an     CU"
-	speed_test '5726' 'Chongqing CU'
-	speed_test '4665' 'Shanghai  CM'
-	speed_test '4575' 'Chengdu   CM'
-	speed_test '6168' 'Kunming   CM'
-	speed_test '6611' 'Guangzhou CM'
-	 
-	rm -rf speedtest.py
+    speed_test '27377' 'Beijing 5G   CT'
+    speed_test '26352' 'Nanjing 5G   CT'
+    speed_test '17145' 'Hefei 5G     CT'
+	speed_test '27594' 'Guangzhou 5G CT'
+	speed_test '27154' 'TianJin 5G   CU'
+	speed_test '24447' 'Shanghai 5G  CU'
+	speed_test '26678' 'Guangzhou 5G CU'
+	speed_test '17184' 'Tianjin 5G   CM'
+	speed_test '26850' 'Wuxi 5G      CM'
+	speed_test '27249' 'Nanjing 5G   CM'
+	speed_test '26404' 'Hefei 5G     CM'
+	speed_test '28491' 'Changsha 5G  CM'
+
+	rm -rf speedtest*
 }
 
 print_speedtest_fast() {
 	printf "%-18s%-18s%-20s%-12s\n" " Node Name" "Upload Speed" "Download Speed" "Latency" | tee -a $log
     speed_test '' 'Speedtest.net'
     speed_fast_com
-    speed_test '7509' 'Hangzhou  CT'
-	speed_test '5083' 'Shanghai  CU'
-	speed_test '4575' 'Chengdu   CM'
+    speed_test '27377' 'Beijing 5G   CT'
+	speed_test '24447' 'ShangHai 5G  CU'
+	speed_test '27249' 'Nanjing 5G   CM'
 	 
-	rm -rf speedtest.py
+	rm -rf speedtest*
 }
 
 speed_fast_com() {
@@ -322,6 +321,8 @@ virt_check(){
 		virtual="KVM"
 	elif [[ "$cname" == *KVM* ]]; then
 		virtual="KVM"
+	elif [[ "$cname" == *QEMU* ]]; then
+		virtual="KVM"
 	elif [[ "$virtualx" == *"VMware Virtual Platform"* ]]; then
 		virtual="VMware"
 	elif [[ "$virtualx" == *"Parallels Software International"* ]]; then
@@ -406,7 +407,7 @@ print_io() {
 
 print_system_info() {
 	echo -e " CPU Model            : ${SKYBLUE}$cname${PLAIN}" | tee -a $log
-	echo -e " CPU Cores            : ${YELLOW}$cores Cores ${SKYBLUE}@ $freq MHz $arch${PLAIN}" | tee -a $log
+	echo -e " CPU Cores            : ${YELLOW}$cores Cores ${SKYBLUE}$freq MHz $arch${PLAIN}" | tee -a $log
 	echo -e " CPU Cache            : ${SKYBLUE}$corescache ${PLAIN}" | tee -a $log
 	echo -e " OS                   : ${SKYBLUE}$opsy ($lbit Bit) ${YELLOW}$virtual${PLAIN}" | tee -a $log
 	echo -e " Kernel               : ${SKYBLUE}$kern${PLAIN}" | tee -a $log
@@ -457,8 +458,8 @@ get_system_info() {
 	lbit=$( getconf LONG_BIT )
 	kern=$( uname -r )
 
-	disk_size1=($( LANG=C df -hPl | grep -wvE '\-|none|tmpfs|overlay|shm|udev|devtmpfs|by-uuid|chroot|Filesystem' | awk '{print $2}' ))
-	disk_size2=($( LANG=C df -hPl | grep -wvE '\-|none|tmpfs|overlay|shm|udev|devtmpfs|by-uuid|chroot|Filesystem' | awk '{print $3}' ))
+	disk_size1=$( LANG=C df -hPl | grep -wvE '\-|none|tmpfs|overlay|shm|udev|devtmpfs|by-uuid|chroot|Filesystem' | awk '{print $2}' )
+	disk_size2=$( LANG=C df -hPl | grep -wvE '\-|none|tmpfs|overlay|shm|udev|devtmpfs|by-uuid|chroot|Filesystem' | awk '{print $3}' )
 	disk_total_size=$( calc_disk ${disk_size1[@]} )
 	disk_used_size=$( calc_disk ${disk_size2[@]} )
 
@@ -469,8 +470,8 @@ get_system_info() {
 
 print_intro() {
 	printf ' Superbench.sh -- https://www.oldking.net/350.html\n' | tee -a $log
-	printf " Mode  : \e${GREEN}%s\e${PLAIN}    Version : \e${GREEN}%s${PLAIN}\n" $mode_name 1.1.4 | tee -a $log
-	printf ' Usage : wget -qO- git.io/superbench.sh | bash\n' | tee -a $log
+	printf " Mode  : \e${GREEN}%s\e${PLAIN}    Version : \e${GREEN}%s${PLAIN}\n" $mode_name 1.1.7 | tee -a $log
+	printf ' Usage : wget -qO- sb.oldking.net | bash\n' | tee -a $log
 }
 
 sharetest() {
@@ -479,7 +480,7 @@ sharetest() {
 	log_preupload
 	case $1 in
 	'ubuntu')
-		share_link=$( curl -v --data-urlencode "content@$log_up" -d "poster=superbench.sh" -d "syntax=text" "https://paste.ubuntu.com" 2>&1 | \
+		share_link="https://paste.ubuntu.com"$( curl -v --data-urlencode "content@$log_up" -d "poster=superbench.sh" -d "syntax=text" "https://paste.ubuntu.com" 2>&1 | \
 			grep "Location" | awk '{print $3}' );;
 	'haste' )
 		share_link=$( curl -X POST -s -d "$(cat $log)" https://hastebin.com/documents | awk -F '"' '{print "https://hastebin.com/"$4}' );;
@@ -503,10 +504,10 @@ log_preupload() {
 }
 
 cleanup() {
-	rm -f test_file_*;
-	rm -f speedtest.py;
-	rm -f fast_com*;
-	rm -f tools.py;
+	rm -f test_file_*
+	rm -rf speedtest*
+	rm -f fast_com*
+	rm -f tools.py
 	rm -f ip_json.json
 }
 
@@ -553,8 +554,10 @@ fast_bench(){
 	cleanup;
 }
 
-log="$HOME/superbench.log"
+log="./superbench.log"
 true > $log
+speedLog="./speedtest.log"
+true > $speedLog
 
 case $1 in
 	'info'|'-i'|'--i'|'-info'|'--info' )
